@@ -1,6 +1,9 @@
 from .base import Node
 from .base import GraphBase
 from typing import Dict, List, Tuple, Optional, Any, Set, FrozenSet
+import random
+import math
+from tqdm import tqdm
 
 class WeightedUndirectedGraph(GraphBase):
     def __init__(self):
@@ -60,3 +63,43 @@ class WeightedUndirectedGraph(GraphBase):
             self.edge_weights[edge] = float(value)
         else:
             raise ValueError(f"Unknown attribute '{attr_name}'")
+    
+    def optimize_layout(self, iterations: int = 50) -> None:
+        """Automatically organize vertex positions for better visualization."""
+        n = len(self.nodes)
+        if n == 0:
+            return
+        
+        for i in range(n):
+            if self.nodes[i].x is None or self.nodes[i].y is None:
+                self.set_pos(i, random.uniform(0, 100), random.uniform(0, 100))
+        
+        for iteration in tqdm(range(iterations)):
+            for i in range(n):
+                fx, fy = 0, 0
+                x_i, y_i = self.get_pos(i)
+                
+                for j in range(n):
+                    if i != j:
+                        x_j, y_j = self.get_pos(j)
+                        dx, dy = x_j - x_i, y_j - y_i
+                        distance = math.sqrt(dx*dx + dy*dy) + 0.1
+                        force = 200 / (distance * distance)
+                        fx -= force * dx / distance
+                        fy -= force * dy / distance
+                
+                for edge in self.edges:
+                    if i in edge:
+                        other = next(v for v in edge if v != i)
+                        x_other, y_other = self.get_pos(other)
+                        dx, dy = x_other - x_i, y_other - y_i
+                        distance = math.sqrt(dx*dx + dy*dy) + 0.1
+                        weight = self.edge_weights[edge]
+                        force = distance * 0.05 * (weight / 10.0)
+                        fx += force * dx / distance
+                        fy += force * dy / distance
+                
+                cool = 1.0 - (iteration / iterations) * 0.9
+                new_x = x_i + fx * cool * 0.1
+                new_y = y_i + fy * cool * 0.1
+                self.set_pos(i, max(5, min(95, new_x)), max(5, min(95, new_y)))
